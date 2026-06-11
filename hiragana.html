@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Hiragana Trainer</title>
+
+<style>
+body{
+  font-family:Arial,sans-serif;
+  background:#111;
+  color:#eee;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  margin:0
+}
+
+.container{
+  display:flex;
+  gap:30px;
+  align-items:flex-start
+}
+
+.wordsPanel,.side{
+  width:220px;
+  display:flex;
+  flex-direction:column;
+  gap:8px
+}
+
+.side{
+  width:240px;
+  max-height:90vh;
+  overflow-y:auto
+}
+
+.wordBox{
+  background:#1b1b1b;
+  padding:8px;
+  border-radius:6px
+}
+
+.wordJP{font-size:18px}
+
+.wordEN,.pronunciation,.section-title{
+  font-size:12px;
+  opacity:.7
+}
+
+.wordEN,.pronunciation{
+  margin-top:2px
+}
+
+.main{
+  width:420px;
+  display:flex;
+  flex-direction:column;
+  align-items:center
+}
+
+#progress{
+  font-size:14px;
+  opacity:.7;
+  margin-bottom:5px
+}
+
+#card{
+  font-size:80px;
+  margin-bottom:2px
+}
+
+#questionPronunciation{
+  font-size:16px;
+  opacity:.7;
+  margin-bottom:10px;
+  height:20px
+}
+
+.options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  width:300px
+}
+
+#rows{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px
+}
+
+#rows button{
+  width:100%
+}
+
+input{
+  width:200px;
+  font-size:18px;
+  padding:8px;
+  border:none;
+  border-radius:6px;
+  text-align:center
+}
+
+button{
+  font-size:18px;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  background:#333;
+  color:#fff;
+  cursor:pointer
+}
+
+button:hover{
+  background:#444
+}
+
+.side button{
+  background:#222;
+  font-size:15px
+}
+
+#feedback{
+  margin-top:10px;
+  height:20px;
+  font-size:16px
+}
+
+#timer{
+  margin-top:6px;
+  font-size:14px;
+  opacity:.7
+}
+
+.hidden{
+  display:none
+}
+
+.active-mode{
+  outline:2px solid #4caf50
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="wordsPanel">
+
+  <div class="section-title">Word Practice</div>
+
+  <button onclick="genWords()">Generate</button>
+
+  <button onclick="reveal^=1,renderWords()">
+    Reveal
+  </button>
+
+  <button id="wordDakBtn" onclick="toggleWordDakuten()">
+    Dakuten Words: OFF
+  </button>
+
+  <div id="wordList"></div>
+
+</div>
+
+<div class="main">
+
+  <div id="progress"></div>
+
+  <div id="card"></div>
+
+  <div id="questionPronunciation"></div>
+
+  <div id="mcArea">
+    <div class="options" id="options"></div>
+  </div>
+
+  <div id="typeArea" style="display:none">
+    <input
+      id="typeInput"
+      oninput="handleTyping()"
+      placeholder="type answer..."
+    >
+  </div>
+
+  <div id="timer">0.00s</div>
+
+  <div id="feedback"></div>
+
+</div>
+
+<div class="side">
+
+  <div class="section-title">Mode</div>
+
+  <button onclick="setRandom(0)">
+    Fixed Order
+  </button>
+
+  <button onclick="setRandom(1)">
+    Randomized
+  </button>
+
+  <button onclick="toggleMode()">
+    Mode:
+    <span id="modeLabel">
+      Multiple Choice
+    </span>
+  </button>
+
+  <button id="reverseBtn" onclick="toggleReverse()">
+    Reverse: OFF
+  </button>
+
+  <button id="dakutenBtn" onclick="toggleDakuten()">
+    Dakuten/Handakuten: OFF
+  </button>
+
+  <button id="restrictBtn" onclick="toggleRestriction()">
+    Restricted Answers: ON
+  </button>
+
+  <button id="pronBtn" onclick="togglePron()">
+    Pronunciations: ON
+  </button>
+
+  <div class="section-title">Rows</div>
+
+  <div id="rows"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const $=id=>document.getElementById(id)
+
+const baseKana=[
+["あ","a","ah"],["い","i","ee"],["う","u","oo"],["え","e","eh"],["お","o","oh"],
+["か","ka","kah"],["き","ki","kee"],["く","ku","koo"],["け","ke","keh"],["こ","ko","koh"],
+["さ","sa","sah"],["し","shi","shee"],["す","su","soo"],["せ","se","seh"],["そ","so","soh"],
+["た","ta","tah"],["ち","chi","chee"],["つ","tsu","tsoo"],["て","te","teh"],["と","to","toh"],
+["な","na","nah"],["に","ni","nee"],["ぬ","nu","noo"],["ね","ne","neh"],["の","no","noh"],
+["は","ha","hah"],["ひ","hi","hee"],["ふ","fu","foo"],["へ","he","heh"],["ほ","ho","hoh"],
+["ま","ma","mah"],["み","mi","mee"],["む","mu","moo"],["め","me","meh"],["も","mo","moh"],
+["や","ya","yah"],["ゆ","yu","yoo"],["よ","yo","yoh"],
+["ら","ra","rah"],["り","ri","ree"],["る","ru","roo"],["れ","re","reh"],["ろ","ro","roh"],
+["わ","wa","wah"],["を","wo","woh"],["ん","n","nn"]
+]
+
+const extraKana=[
+["が","ga","gah"],["ぎ","gi","gee"],["ぐ","gu","goo"],["げ","ge","geh"],["ご","go","goh"],
+["ざ","za","zah"],["じ","ji","jee"],["ず","zu","zoo"],["ぜ","ze","zeh"],["ぞ","zo","zoh"],
+["だ","da","dah"],["ぢ","ji/di","jee"],["づ","zu/du","zoo"],["で","de","deh"],["ど","do","doh"],
+["ば","ba","bah"],["び","bi","bee"],["ぶ","bu","boo"],["べ","be","beh"],["ぼ","bo","boh"],
+["ぱ","pa","pah"],["ぴ","pi","pee"],["ぷ","pu","poo"],["ぺ","pe","peh"],["ぽ","po","poh"]
+]
+
+const kana=[...baseKana,...extraKana]
+
+const groups={
+  all:baseKana,
+  a:baseKana.slice(0,5),
+  k:baseKana.slice(5,10),
+  s:baseKana.slice(10,15),
+  t:baseKana.slice(15,20),
+  n:baseKana.slice(20,25),
+  h:baseKana.slice(25,30),
+  m:baseKana.slice(30,35),
+  y:baseKana.slice(35,38),
+  r:baseKana.slice(38,43),
+  w:baseKana.slice(43,46)
+}
+
+const dakutenMap={
+  k:extraKana.slice(0,5),
+  s:extraKana.slice(5,10),
+  t:extraKana.slice(10,15),
+  h:extraKana.slice(15,25)
+}
+
+const basicWords=[
+["こんにちは","konnichiwa"],
+["ありがとう","arigatou"],
+["さようなら","sayounara"],
+["すし","sushi"],
+["てんき","tenki"],
+["やま","yama"],
+["かわ","kawa"],
+["みず","mizu"],
+["ひと","hito"],
+["いぬ","inu"],
+["ねこ","neko"],
+["とり","tori"],
+["うみ","umi"],
+["そら","sora"],
+["はな","hana"],
+["ほし","hoshi"],
+["ゆき","yuki"],
+["あめ","ame"],
+["くも","kumo"],
+["つき","tsuki"],
+["こえ","koe"],
+["まど","mado"],
+["いえ","ie"],
+["へや","heya"],
+["みち","michi"],
+["くるま","kuruma"],
+["やさい","yasai"],
+["くだもの","kudamono"],
+["さかな","sakana"],
+["おちゃ","ocha"],
+["たまご","tamago"],
+["こども","kodomo"],
+["おとな","otona"],
+["せかい","sekai"],
+["ともだち","tomodachi"],
+["こころ","kokoro"],
+["からだ","karada"],
+["あさ","asa"],
+["ひる","hiru"],
+["よる","yoru"],
+["あした","ashita"],
+["きのう","kinou"],
+["あお","ao"],
+["あか","aka"],
+["しろ","shiro"],
+["くろ","kuro"],
+["きいろ","kiiro"],
+["みどり","midori"],
+["むらさき","murasaki"],
+["ちゃいろ","chairo"]
+]
+
+const dakutenWords=[
+["がくせい","gakusei"],
+["ぎんこう","ginkou"],
+["げんき","genki"],
+["ごはん","gohan"],
+["ざっし","zasshi"],
+["じてんしゃ","jitensha"],
+["ずこう","zukou"],
+["ぜんぶ","zenbu"],
+["ぞう","zou"],
+["だいがく","daigaku"],
+["でんわ","denwa"],
+["どようび","doyoubi"],
+["びょういん","byouin"],
+["ばんごはん","bangohan"],
+["ぶた","buta"],
+["べんとう","bentou"],
+["ぼうし","boushi"],
+["ぱん","pan"],
+["ぴあの","piano"],
+["ぷーる","puuru"],
+["ぺん","pen"],
+["ぽけっと","poketto"],
+["がいこく","gaikoku"],
+["ぎゅうにゅう","gyuunyuu"],
+["げーむ","geemu"],
+["ごみ","gomi"],
+["ざる","zaru"],
+["じかん","jikan"],
+["ずっと","zutto"],
+["ぜんぜん","zenzen"],
+["ぞく","zoku"],
+["だれ","dare"],
+["ぢず","jizu"],
+["づけ","zuke"],
+["でぐち","deguchi"],
+["どあ","doa"],
+["ばしょ","basho"],
+["びじゅつ","bijutsu"],
+["ぶんがく","bungaku"],
+["べつ","betsu"],
+["ぼく","boku"],
+["ぱじゃま","pajama"],
+["ぴんく","pinku"],
+["ぷりん","purin"],
+["ぺーじ","peeji"],
+["ぽすと","posuto"],
+["がまん","gaman"],
+["ぎり","giri"],
+["ぐあい","guai"],
+["げき","geki"],
+["ござる","gozaru"]
+]
+
+let rows=new Set(["all"]),
+i=0,
+set=[],
+opts=[],
+correct="",
+prompt="",
+reveal=0,
+random=0,
+typing=0,
+reverse=0,
+restrict=1,
+showPron=1,
+useDakuten=0,
+wordDakuten=0,
+currentWords=[],
+timer=0,
+timerInt=null
+
+const shuffle=a=>[...a].sort(()=>Math.random()-.5)
+
+function active(){
+
+  let out=[]
+
+  rows.forEach(r=>{
+
+    out.push(...groups[r])
+
+    if(useDakuten && dakutenMap[r])
+      out.push(...dakutenMap[r])
+
+    if(useDakuten && r=="all")
+      out.push(...extraKana)
+  })
+
+  return out
+}
+
+function startTimer(){
+
+  clearInterval(timerInt)
+
+  timer=0
+
+  $("timer").textContent="0.00s"
+
+  timerInt=setInterval(()=>{
+
+    timer+=.01
+
+    $("timer").textContent=
+      timer.toFixed(2)+"s"
+
+  },10)
+}
+
+function stopTimer(){
+
+  clearInterval(timerInt)
+}
+
+function resetProgress(){
+
+  i=0
+
+  set=random
+    ? shuffle(active())
+    : active()
+
+  startTimer()
+
+  question()
+}
+
+function rebuild(){
+
+  stopTimer()
+
+  resetProgress()
+}
+
+function question(){
+
+  const [jp,ro,pr]=set[i]
+
+  prompt=reverse?ro:jp
+  correct=reverse?jp:ro
+
+  $("card").textContent=prompt
+
+  $("questionPronunciation").textContent=
+    reverse&&showPron
+      ? `/${pr}/`
+      : ""
+
+  $("progress").textContent=
+    `${i+1} / ${set.length}`
+
+  makeOptions()
+
+  if(!typing)
+    renderMC()
+}
+
+function makeOptions(){
+
+  const src=(restrict
+    ? active()
+    : kana
+  ).map(x=>x[reverse?0:1])
+
+  opts=shuffle([
+    correct,
+    ...shuffle(
+      src.filter(x=>x!==correct)
+    ).slice(0,3)
+  ])
+}
+
+function renderMC(){
+
+  $("options").innerHTML=""
+
+  opts.forEach(o=>{
+
+    const b=document.createElement("button")
+
+    if(reverse){
+
+      b.innerHTML=`<div>${o}</div>`
+
+    }else{
+
+      const p=
+        kana.find(x=>x[1]==o)?.[2]||""
+
+      b.innerHTML=`
+        <div>${o}</div>
+        ${showPron
+          ? `<div class="pronunciation">/${p}/</div>`
+          : ""}
+      `
+    }
+
+    b.onclick=()=>{
+
+      const f=$("feedback")
+
+      if(o===correct){
+
+        f.textContent="Correct"
+        f.style.color="#4caf50"
+
+        setTimeout(next,250)
+
+      }else{
+
+        f.textContent="Wrong"
+        f.style.color="#f44336"
+      }
+    }
+
+    $("options").appendChild(b)
+  })
+}
+
+function next(){
+
+  i++
+
+  $("feedback").textContent=""
+  $("typeInput").value=""
+
+  if(i>=set.length){
+
+    stopTimer()
+
+    setTimeout(resetProgress,300)
+
+    return
+  }
+
+  question()
+}
+
+function handleTyping(){
+
+  let v=$("typeInput")
+    .value.trim().toLowerCase()
+
+  let correctAnswers
+
+  if(correct=="ji/di")
+    correctAnswers=["ji","di","ji/di"]
+
+  else if(correct=="zu/du")
+    correctAnswers=["zu","du","zu/du"]
+
+  else
+    correctAnswers=[correct.toLowerCase()]
+
+  if(v.length < Math.min(...correctAnswers.map(x=>x.length)))
+    return
+
+  if(correctAnswers.includes(v)){
+
+    $("feedback").textContent="Correct"
+    $("feedback").style.color="#4caf50"
+
+    setTimeout(next,200)
+
+  }else{
+
+    $("feedback").textContent=""
+  }
+}
+
+function toggleMode(){
+
+  typing^=1
+
+  $("modeLabel").textContent=
+    typing
+      ? "Typing"
+      : "Multiple Choice"
+
+  $("mcArea")
+    .classList
+    .toggle("hidden",typing)
+
+  $("typeArea").style.display=
+    typing
+      ? "block"
+      : "none"
+
+  rebuild()
+}
+
+function toggleReverse(){
+
+  reverse^=1
+
+  $("reverseBtn").textContent=
+    `Reverse: ${reverse?"ON":"OFF"}`
+
+  rebuild()
+}
+
+function toggleDakuten(){
+
+  useDakuten^=1
+
+  $("dakutenBtn").textContent=
+    `Dakuten/Handakuten: ${useDakuten?"ON":"OFF"}`
+
+  rebuild()
+}
+
+function toggleWordDakuten(){
+
+  wordDakuten^=1
+
+  $("wordDakBtn").textContent=
+    `Dakuten Words: ${wordDakuten?"ON":"OFF"}`
+
+  genWords()
+}
+
+function toggleRestriction(){
+
+  restrict^=1
+
+  $("restrictBtn").textContent=
+    `Restricted Answers: ${restrict?"ON":"OFF"}`
+
+  makeOptions()
+
+  if(!typing)
+    renderMC()
+}
+
+function togglePron(){
+
+  showPron^=1
+
+  $("pronBtn").textContent=
+    `Pronunciations: ${showPron?"ON":"OFF"}`
+
+  question()
+}
+
+function setRandom(v){
+
+  random=v
+
+  rebuild()
+}
+
+function toggleRow(r){
+
+  if(r=="all"){
+
+    rows=new Set(["all"])
+
+  }else{
+
+    rows.delete("all")
+
+    rows.has(r)
+      ? rows.delete(r)
+      : rows.add(r)
+
+    if(!rows.size)
+      rows.add("all")
+  }
+
+  updateRows()
+
+  rebuild()
+}
+
+function updateRows(){
+
+  document
+    .querySelectorAll("#rows button")
+    .forEach(b=>
+      b.classList.remove("active-mode")
+    )
+
+  rows.forEach(r=>
+    $("row_"+r)
+      ?.classList.add("active-mode")
+  )
+}
+
+function genWords(){
+
+  currentWords=shuffle([
+    ...basicWords,
+    ...(wordDakuten?dakutenWords:[])
+  ]).slice(0,6)
+
+  renderWords()
+}
+
+function renderWords(){
+
+  $("wordList").innerHTML=
+    currentWords.map(([jp,ro])=>`
+      <div class="wordBox">
+        <div class="wordJP">${jp}</div>
+        ${reveal
+          ? `<div class="wordEN">${ro}</div>`
+          : ""}
+      </div>
+    `).join("")
+}
+
+;[
+["all","All"],
+["a","A Row"],
+["k","K Row"],
+["s","S Row"],
+["t","T Row"],
+["n","N Row"],
+["h","H Row"],
+["m","M Row"],
+["y","Y Row"],
+["r","R Row"],
+["w","W Row + N"]
+].forEach(([k,v])=>
+  $("rows").innerHTML+=`
+    <button
+      id="row_${k}"
+      onclick="toggleRow('${k}')"
+    >${v}</button>
+  `
+)
+
+updateRows()
+
+genWords()
+
+resetProgress()
+
+</script>
+
+</body>
+</html>
